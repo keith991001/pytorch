@@ -2360,6 +2360,7 @@ class TestIndexingDevice(TestCase):
     @serialTest()
     @onlyAccelerator
     @dtypes(torch.complex64, torch.complex128, torch.bool)
+    @dtypesIfMPS(torch.complex64, torch.bool)
     def test_index_add_excluded_dtypes(self, device, dtype):
         # Originally test added for CUDA implementation:
         # scatter_add_'s CUDA dispatch covers neither complex nor bool, so the
