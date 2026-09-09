@@ -1019,11 +1019,29 @@ class _TorchDynamoContext:
                         self._package.initialize(
                             fn_key, result.dynamo, ignore_inlined_sources=False
                         )
-                        self._package.install(result.backends)
+                        # Install into the SAME region this context looks up in.
+                        # Precompile entries match their own region only, so a
+                        # default-bucket install here would never be found by an
+                        # isolate_recompiles=True context -- the cache would load
+                        # and then silently serve nothing.
+                        self._package.install(
+                            result.backends,
+                            isolate_recompiles_id=self._isolate_recompiles_id,
+                        )
                     except RuntimeError:
                         log.warning(
                             "Failed to load entry from dynamo cache", exc_info=True
                         )
+                        # install() binds an entry's globals and precompile
+                        # entries before it discovers a missing backend on a
+                        # later entry, so a partial install stays live in this
+                        # context's region (the finalizer never fires while this
+                        # context retains the package). Undo it before re-init.
+                        self._package.uninstall()
+                        # initialize() above already set _initialized before
+                        # install() raised, so clear it or the fresh re-init
+                        # below trips its already-initialized assertion.
+                        self._package._initialized = False
                         self._package.initialize(
                             fn_key, None, ignore_inlined_sources=False
                         )
